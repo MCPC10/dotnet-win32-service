@@ -17,9 +17,7 @@ namespace TestService
             this.commandLineArguments = commandLineArguments;
         }
 
-        public string ServiceName => "Test Service";
-
-        public void Start(string[] startupArguments, ServiceStoppedCallback serviceStoppedCallback)
+        public void Start(string serviceName, string[] startupArguments, ServiceStoppedCallback serviceStoppedCallback)
         {
             // in addition to the arguments that the service has been registered with,
             // each service start may add additional startup parameters.

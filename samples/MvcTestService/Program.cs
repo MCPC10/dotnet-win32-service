@@ -74,7 +74,7 @@ namespace MvcTestService
                 Directory.SetCurrentDirectory(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
             }
 
-            BuildWebHost(args).RunAsService(ServiceName);
+            BuildWebHost(args).RunAsService();
         }
 
         private static void RunInteractive(string[] args)
