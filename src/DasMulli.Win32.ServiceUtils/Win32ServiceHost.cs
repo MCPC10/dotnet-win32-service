@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -14,7 +15,6 @@ namespace DasMulli.Win32.ServiceUtils
     [PublicAPI]
     public sealed class Win32ServiceHost
     {
-        private readonly string serviceName;
         private readonly IWin32ServiceStateMachine stateMachine;
         private readonly INativeInterop nativeInterop;
 
@@ -46,7 +46,6 @@ namespace DasMulli.Win32.ServiceUtils
             }
 
             this.nativeInterop = nativeInterop ?? throw new ArgumentNullException(nameof(nativeInterop));
-            serviceName = service.ServiceName;
             stateMachine = new SimpleServiceStateMachine(service);
 
             serviceMainFunctionDelegate = ServiceMainFunction;
@@ -69,7 +68,6 @@ namespace DasMulli.Win32.ServiceUtils
             }
 
             this.nativeInterop = nativeInterop ?? throw new ArgumentNullException(nameof(nativeInterop));
-            serviceName = service.ServiceName;
             stateMachine = new PausableServiceStateMachine(service);
 
             serviceMainFunctionDelegate = ServiceMainFunction;
@@ -79,16 +77,14 @@ namespace DasMulli.Win32.ServiceUtils
         /// <summary>
         /// Initializes a new <see cref="Win32ServiceHost"/> class to run an advanced service with custom state handling.
         /// </summary>
-        /// <param name="serviceName">The name of the Windows service.</param>
         /// <param name="stateMachine">The custom service state machine implementation to use.</param>
-        public Win32ServiceHost([NotNull] string serviceName, [NotNull] IWin32ServiceStateMachine stateMachine)
-            : this(serviceName, stateMachine, Win32Interop.Wrapper)
+        public Win32ServiceHost([NotNull] IWin32ServiceStateMachine stateMachine)
+            : this(stateMachine, Win32Interop.Wrapper)
         {
         }
 
-        internal Win32ServiceHost([NotNull] string serviceName, [NotNull] IWin32ServiceStateMachine stateMachine, [NotNull] INativeInterop nativeInterop)
+        internal Win32ServiceHost([NotNull] IWin32ServiceStateMachine stateMachine, [NotNull] INativeInterop nativeInterop)
         {
-            this.serviceName = serviceName ?? throw new ArgumentNullException(nameof(serviceName));
             this.stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
             this.nativeInterop = nativeInterop ?? throw new ArgumentNullException(nameof(nativeInterop));
 
@@ -115,7 +111,7 @@ namespace DasMulli.Win32.ServiceUtils
         public int Run()
         {
             var serviceTable = new ServiceTableEntry[2]; // second one is null/null to indicate termination
-            serviceTable[0].serviceName = serviceName;
+            serviceTable[0].serviceName = string.Empty; // in the case the service is of the type Win32OwnProcess (what it always is) we can safely write en empty string (not a null) to it
             serviceTable[0].serviceMainFunction = Marshal.GetFunctionPointerForDelegate(serviceMainFunctionDelegate);
 
             try
@@ -141,12 +137,12 @@ namespace DasMulli.Win32.ServiceUtils
 
             return resultCode;
         }
-
+        
         private void ServiceMainFunction(int numArgs, IntPtr argPtrPtr)
         {
-            var startupArguments = ParseArguments(numArgs, argPtrPtr);
-
-            serviceStatusHandle = nativeInterop.RegisterServiceCtrlHandlerExW(serviceName, serviceControlHandlerDelegate, IntPtr.Zero);
+            var args = ParseArguments(numArgs, argPtrPtr);
+            
+            serviceStatusHandle = nativeInterop.RegisterServiceCtrlHandlerExW(args.ServiceName, serviceControlHandlerDelegate, IntPtr.Zero);
 
             if (serviceStatusHandle.IsInvalid)
             {
@@ -158,7 +154,7 @@ namespace DasMulli.Win32.ServiceUtils
 
             try
             {
-                stateMachine.OnStart(startupArguments, ReportServiceStatus);
+                stateMachine.OnStart(args.ServiceName, args.Arguments, ReportServiceStatus);
             }
             catch
             {
@@ -208,21 +204,26 @@ namespace DasMulli.Win32.ServiceUtils
             }
         }
 
-        private static string[] ParseArguments(int numArgs, IntPtr argPtrPtr)
+        private static (string ServiceName, string[] Arguments) ParseArguments(int numArgs, IntPtr argPtrPtr)
         {
             if (numArgs <= 0)
-            {
-                return Array.Empty<string>();
-            }
-            // skip first parameter because it is the name of the service
+                return (string.Empty, Array.Empty<string>());
+            
+            //read service name
+            var argPtr = Marshal.PtrToStructure<IntPtr>(argPtrPtr);
+            var serviceName = Marshal.PtrToStringUni(argPtr);
+            argPtrPtr = IntPtr.Add(argPtrPtr, IntPtr.Size);
+            
+            //read arguments
             var args = new string[numArgs - 1];
             for (var i = 0; i < numArgs - 1; i++)
             {
-                argPtrPtr = IntPtr.Add(argPtrPtr, IntPtr.Size);
-                var argPtr = Marshal.PtrToStructure<IntPtr>(argPtrPtr);
+                argPtr = Marshal.PtrToStructure<IntPtr>(argPtrPtr);
                 args[i] = Marshal.PtrToStringUni(argPtr);
+                argPtrPtr = IntPtr.Add(argPtrPtr, IntPtr.Size);
             }
-            return args;
+            
+            return (serviceName, args);
         }
     }
 }

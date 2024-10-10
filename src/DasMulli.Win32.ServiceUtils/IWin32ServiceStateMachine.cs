@@ -15,9 +15,10 @@ namespace DasMulli.Win32.ServiceUtils
         /// Use the provided <see cref="ServiceStatusReportCallback"/> to notify the service manager about
         /// state changes such as started, paused etc.
         /// </summary>
+        /// <param name="serviceName">The name of the service</param>
         /// <param name="startupArguments">The startup arguments.</param>
         /// <param name="statusReportCallback">Notifies the service manager of a status change.</param>
-        void OnStart(string[] startupArguments, ServiceStatusReportCallback statusReportCallback);
+        void OnStart(string serviceName, string[] startupArguments, ServiceStatusReportCallback statusReportCallback);
 
         /// <summary>
         /// Called by the service host when a command was received from Windows' service system.

@@ -12,17 +12,12 @@
     public interface IWin32Service
     {
         /// <summary>
-        /// Returns the name of the service.
-        /// </summary>
-        string ServiceName { get; }
-
-        /// <summary>
         /// Called by the service host to start the service. When called by <see cref="Win32ServiceHost"/>,
         /// the service startup arguments received from Windows are specified.
         /// </summary>
         /// <param name="startupArguments">The startup arguments.</param>
         /// <param name="serviceStoppedCallback">Notifies the service manager that the service stopped without being requested to stop.</param>
-        void Start(string[] startupArguments, ServiceStoppedCallback serviceStoppedCallback);
+        void Start(string serviceName, string[] startupArguments, ServiceStoppedCallback serviceStoppedCallback);
 
         /// <summary>
         /// Called by the service host to stop the service.
